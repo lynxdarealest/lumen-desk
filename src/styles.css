@@ -97,6 +97,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .range { width: 100%; margin: 3px 0 16px; accent-color: var(--accent); }
 .outline-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 23px; padding: 9px; color: #bac1b9; background: transparent; border: 1px solid #3b443b; border-radius: 4px; font-size: 11px; }
 .outline-btn:hover { color: #fff0cf; border-color: var(--accent); }
+.wallpaper-mode-btn { width: 100%; justify-content: center; margin-top: 12px; }
 .section { margin-top: 36px; }
 .section-heading { display: flex; align-items: end; justify-content: space-between; margin-bottom: 16px; }
 .section-heading h3 { margin: 0 0 5px; font-size: 16px; font-weight: 600; }
@@ -151,4 +152,31 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 @media (max-width: 1180px) {
   .content { padding-right: 30px; padding-left: 30px; }
   .topbar { padding-right: 30px; padding-left: 30px; }
+}
+
+.wallpaper-mode .sidebar,
+.wallpaper-mode .topbar,
+.wallpaper-mode .page-heading,
+.wallpaper-mode .quick-panel,
+.wallpaper-mode .section,
+.wallpaper-mode .bottom-grid {
+  display: none;
+}
+.wallpaper-mode .content,
+.wallpaper-mode .main,
+.wallpaper-mode .hero-grid,
+.wallpaper-mode .preview-card,
+.wallpaper-mode .preview-scene {
+  width: 100vw;
+  max-width: none;
+  min-height: 100vh;
+  height: 100vh;
+  padding: 0;
+  border: 0;
+}
+.wallpaper-mode .preview-scene {
+  border-radius: 0;
+}
+.wallpaper-mode .scene-title {
+  opacity: .35;
 }

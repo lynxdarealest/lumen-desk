@@ -7,6 +7,7 @@ import {
   Waves, X
 } from "lucide-react";
 import { writeLog } from "./logger";
+import { invoke } from "@tauri-apps/api/core";
 
 type View = "overview" | "wallpapers" | "taskbar" | "projects";
 type WallpaperItem = { title: string; type: string; duration: string; accent: string; active?: boolean; source?: string; kind?: "video" | "image" | "audio" };
@@ -36,6 +37,7 @@ function App() {
   const [showAdd, setShowAdd] = useState(false);
   const [toast, setToast] = useState("");
   const [toastKind, setToastKind] = useState<"info" | "error">("info");
+  const [wallpaperMode, setWallpaperMode] = useState(false);
   const activeWallpaper = library.find((item) => item.active) ?? library[0];
   const filtered = useMemo(() => library.filter((item) => item.title.toLowerCase().includes(search.toLowerCase())), [library, search]);
 
@@ -44,6 +46,19 @@ function App() {
     setToastKind("info");
     void writeLog("info", message);
     window.setTimeout(() => setToast(""), 2600);
+  };
+
+  const toggleWallpaperMode = async () => {
+    const next = !wallpaperMode;
+    try {
+      await invoke("set_wallpaper_mode", { enabled: next });
+      setWallpaperMode(next);
+      notify(next ? "Đã đặt Lumen Desk làm wallpaper desktop" : "Đã thoát wallpaper mode");
+    } catch (error) {
+      void writeLog("error", "Không thể đổi wallpaper mode", error);
+      setToast("Không thể đặt wallpaper desktop");
+      setToastKind("error");
+    }
   };
 
   useEffect(() => {
@@ -59,8 +74,16 @@ function App() {
     window.localStorage.setItem("lumen-desk.brightness", String(brightness));
   }, [brightness]);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && wallpaperMode) void toggleWallpaperMode();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [wallpaperMode]);
+
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${wallpaperMode ? "wallpaper-mode" : ""}`}>
       <aside className="sidebar">
         <div className="brand"><div className="brand-mark"><Waves size={18} /></div><span>LUMEN <b>DESK</b></span></div>
         <div className="workspace-picker"><div className="workspace-dot" /><div><small>WORKSPACE</small><strong>Personal setup</strong></div><ChevronDown size={15} /></div>
@@ -77,7 +100,7 @@ function App() {
         <div className="content">
           <section className="page-heading"><div><p className="eyebrow">THỨ BA, 10 THÁNG 11, 2026</p><h1>{view === "overview" ? "Chào buổi sáng, Trương." : navItems.find((item) => item.id === view)?.label}</h1><p className="subheading">Không gian desktop của bạn, được thiết kế theo cách của bạn.</p></div><button className="primary-btn" onClick={() => setShowAdd(true)}><Plus size={17} /> Thêm wallpaper</button></section>
 
-          {view === "overview" && <Overview item={activeWallpaper} playing={playing} setPlaying={setPlaying} brightness={brightness} setBrightness={setBrightness} onOpen={(next) => setView(next)} notify={notify} />}
+          {view === "overview" && <Overview item={activeWallpaper} playing={playing} setPlaying={setPlaying} brightness={brightness} setBrightness={setBrightness} onOpen={(next) => setView(next)} notify={notify} wallpaperMode={wallpaperMode} toggleWallpaperMode={toggleWallpaperMode} />}
           {view === "wallpapers" && <Library items={filtered} search={search} setSearch={setSearch} onAdd={() => setShowAdd(true)} notify={notify} />}
           {view === "taskbar" && <Taskbar notify={notify} />}
           {view === "projects" && <Projects project={project} onImport={setProject} notify={notify} />}
@@ -89,8 +112,8 @@ function App() {
   );
 }
 
-function Overview({ item, playing, setPlaying, brightness, setBrightness, onOpen, notify }: { item: WallpaperItem; playing: boolean; setPlaying: (v: boolean) => void; brightness: number; setBrightness: (v: number) => void; onOpen: (v: View) => void; notify: (v: string) => void }) {
-  return <><div className="hero-grid"><div className="preview-card"><div className="preview-scene" style={{ filter: `brightness(${brightness}%)` }}>{item.source && item.kind === "video" && <video className="media-preview" src={item.source} autoPlay={playing} loop muted playsInline />}{item.source && item.kind === "image" && <img className="media-preview" src={item.source} alt={item.title} />}{!item.source && <><div className="sun-glow" /><div className="city-grid" /></>}<div className="scene-title"><span>ĐANG PHÁT</span><h2>{item.title}</h2><p>{item.type}</p></div><div className="preview-controls"><button className="round-control" onClick={() => setPlaying(!playing)}>{playing ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}</button><div className="track-line"><i /><span>{item.kind === "audio" ? "Audio" : "Live"}</span><b>{item.duration}</b></div><button className="round-control"><Volume2 size={17} /></button></div></div></div><div className="quick-panel"><div className="panel-title"><span>ĐIỀU KHIỂN NHANH</span><button onClick={() => onOpen("taskbar")}><Settings2 size={16} /></button></div><div className="control-row"><div className="control-icon violet"><Sun size={18} /></div><div><small>Độ sáng wallpaper</small><strong>{brightness}%</strong></div></div><input className="range" type="range" min="0" max="100" value={brightness} onChange={(e) => setBrightness(Number(e.target.value))} /><div className="control-row"><div className="control-icon blue"><Monitor size={18} /></div><div><small>Đang hiển thị trên</small><strong>DELL U2723QE <span className="online">● Online</span></strong></div></div><button className="outline-btn" onClick={() => notify("Đang dùng màn hình chính")}><Grid2X2 size={16} /> Quản lý màn hình</button></div></div><section className="section"><div className="section-heading"><div><h3>Wallpaper gần đây</h3><p>Chuyển đổi nhanh giữa bộ sưu tập của bạn.</p></div><button className="text-btn" onClick={() => onOpen("wallpapers")}>Xem tất cả <span>→</span></button></div><div className="wallpaper-row">{wallpapers.slice(0, 3).map((entry) => <WallpaperCard key={entry.title} item={entry} onClick={() => notify(`Đã chọn ${entry.title}`)} />)}</div></section><div className="bottom-grid"><div className="tip-card"><div className="tip-icon"><Activity size={20} /></div><div><span>MẸO NHANH</span><h3>Biến taskbar thành một phần của wallpaper.</h3><p>Thử chế độ trong suốt và tự động đổi màu theo nền.</p></div><button onClick={() => onOpen("taskbar")}>Khám phá <span>→</span></button></div><div className="weather-card"><CloudSun size={25} /><div><small>HÀ NỘI / HÔM NAY</small><strong>27° <span>Ít mây</span></strong></div><div className="weather-wave" /></div></div></>;
+function Overview({ item, playing, setPlaying, brightness, setBrightness, onOpen, notify, wallpaperMode, toggleWallpaperMode }: { item: WallpaperItem; playing: boolean; setPlaying: (v: boolean) => void; brightness: number; setBrightness: (v: number) => void; onOpen: (v: View) => void; notify: (v: string) => void; wallpaperMode: boolean; toggleWallpaperMode: () => void }) {
+  return <><div className="hero-grid"><div className="preview-card"><div className="preview-scene" style={{ filter: `brightness(${brightness}%)` }}>{item.source && item.kind === "video" && <video className="media-preview" src={item.source} autoPlay={playing} loop muted playsInline />}{item.source && item.kind === "image" && <img className="media-preview" src={item.source} alt={item.title} />}{!item.source && <><div className="sun-glow" /><div className="city-grid" /></>}<div className="scene-title"><span>ĐANG PHÁT</span><h2>{item.title}</h2><p>{item.type}</p></div><div className="preview-controls"><button className="round-control" onClick={() => setPlaying(!playing)}>{playing ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}</button><div className="track-line"><i /><span>{item.kind === "audio" ? "Audio" : "Live"}</span><b>{item.duration}</b></div><button className="round-control"><Volume2 size={17} /></button></div></div></div><div className="quick-panel"><div className="panel-title"><span>ĐIỀU KHIỂN NHANH</span><button onClick={() => onOpen("taskbar")}><Settings2 size={16} /></button></div><div className="control-row"><div className="control-icon violet"><Sun size={18} /></div><div><small>Độ sáng wallpaper</small><strong>{brightness}%</strong></div></div><input className="range" type="range" min="0" max="100" value={brightness} onChange={(e) => setBrightness(Number(e.target.value))} /><div className="control-row"><div className="control-icon blue"><Monitor size={18} /></div><div><small>Đang hiển thị trên</small><strong>DELL U2723QE <span className="online">● Online</span></strong></div></div><button className="outline-btn" onClick={() => notify("Đang dùng màn hình chính")}><Grid2X2 size={16} /> Quản lý màn hình</button><button className="primary-btn wallpaper-mode-btn" onClick={toggleWallpaperMode}>{wallpaperMode ? "Thoát wallpaper mode" : "Đặt làm wallpaper desktop"}</button></div></div><section className="section"><div className="section-heading"><div><h3>Wallpaper gần đây</h3><p>Chuyển đổi nhanh giữa bộ sưu tập của bạn.</p></div><button className="text-btn" onClick={() => onOpen("wallpapers")}>Xem tất cả <span>→</span></button></div><div className="wallpaper-row">{wallpapers.slice(0, 3).map((entry) => <WallpaperCard key={entry.title} item={entry} onClick={() => notify(`Đã chọn ${entry.title}`)} />)}</div></section><div className="bottom-grid"><div className="tip-card"><div className="tip-icon"><Activity size={20} /></div><div><span>MẸO NHANH</span><h3>Biến taskbar thành một phần của wallpaper.</h3><p>Thử chế độ trong suốt và tự động đổi màu theo nền.</p></div><button onClick={() => onOpen("taskbar")}>Khám phá <span>→</span></button></div><div className="weather-card"><CloudSun size={25} /><div><small>HÀ NỘI / HÔM NAY</small><strong>27° <span>Ít mây</span></strong></div><div className="weather-wave" /></div></div></>;
 }
 
 function Library({ items, search, setSearch, onAdd, notify }: { items: WallpaperItem[]; search: string; setSearch: (v: string) => void; onAdd: () => void; notify: (v: string) => void }) {
