@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 
 type View = "overview" | "wallpapers" | "taskbar" | "projects";
-type WallpaperItem = { title: string; type: string; duration: string; accent: string; active?: boolean };
+type WallpaperItem = { title: string; type: string; duration: string; accent: string; active?: boolean; source?: string; kind?: "video" | "image" | "audio" };
 
 const wallpapers: WallpaperItem[] = [
   { title: "Neon Tokyo", type: "MP4 / 4K", duration: "02:14", accent: "tokyo", active: true },
@@ -26,12 +26,14 @@ const navItems: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
 
 function App() {
   const [view, setView] = useState<View>("overview");
+  const [library, setLibrary] = useState(wallpapers);
   const [playing, setPlaying] = useState(true);
   const [brightness, setBrightness] = useState(78);
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [toast, setToast] = useState("");
-  const filtered = useMemo(() => wallpapers.filter((item) => item.title.toLowerCase().includes(search.toLowerCase())), [search]);
+  const activeWallpaper = library.find((item) => item.active) ?? library[0];
+  const filtered = useMemo(() => library.filter((item) => item.title.toLowerCase().includes(search.toLowerCase())), [library, search]);
 
   const notify = (message: string) => {
     setToast(message);
@@ -56,24 +58,24 @@ function App() {
         <div className="content">
           <section className="page-heading"><div><p className="eyebrow">THỨ BA, 10 THÁNG 11, 2026</p><h1>{view === "overview" ? "Chào buổi sáng, Trương." : navItems.find((item) => item.id === view)?.label}</h1><p className="subheading">Không gian desktop của bạn, được thiết kế theo cách của bạn.</p></div><button className="primary-btn" onClick={() => setShowAdd(true)}><Plus size={17} /> Thêm wallpaper</button></section>
 
-          {view === "overview" && <Overview playing={playing} setPlaying={setPlaying} brightness={brightness} setBrightness={setBrightness} onOpen={(next) => setView(next)} notify={notify} />}
+          {view === "overview" && <Overview item={activeWallpaper} playing={playing} setPlaying={setPlaying} brightness={brightness} setBrightness={setBrightness} onOpen={(next) => setView(next)} notify={notify} />}
           {view === "wallpapers" && <Library items={filtered} search={search} setSearch={setSearch} onAdd={() => setShowAdd(true)} notify={notify} />}
           {view === "taskbar" && <Taskbar notify={notify} />}
           {view === "projects" && <Projects notify={notify} />}
         </div>
       </main>
-      {showAdd && <AddModal onClose={() => setShowAdd(false)} notify={notify} />}
+      {showAdd && <AddModal onClose={() => setShowAdd(false)} onImport={(item) => { setLibrary((current) => [item, ...current.map((entry) => ({ ...entry, active: false }))]); setShowAdd(false); setPlaying(true); notify(`Đã thêm ${item.title}`); }} />}
       {toast && <div className="toast"><Activity size={16} />{toast}</div>}
     </div>
   );
 }
 
-function Overview({ playing, setPlaying, brightness, setBrightness, onOpen, notify }: { playing: boolean; setPlaying: (v: boolean) => void; brightness: number; setBrightness: (v: number) => void; onOpen: (v: View) => void; notify: (v: string) => void }) {
-  return <><div className="hero-grid"><div className="preview-card"><div className="preview-scene"><div className="sun-glow" /><div className="city-grid" /><div className="scene-title"><span>ĐANG PHÁT</span><h2>Neon Tokyo</h2><p>MP4 / 4K UHD / 60 FPS</p></div><div className="preview-controls"><button className="round-control" onClick={() => setPlaying(!playing)}>{playing ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}</button><div className="track-line"><i /><span>01:24</span><b>/ 02:14</b></div><button className="round-control"><Volume2 size={17} /></button></div></div></div><div className="quick-panel"><div className="panel-title"><span>ĐIỀU KHIỂN NHANH</span><button onClick={() => onOpen("taskbar")}><Settings2 size={16} /></button></div><div className="control-row"><div className="control-icon violet"><Sun size={18} /></div><div><small>Độ sáng wallpaper</small><strong>{brightness}%</strong></div></div><input className="range" type="range" min="0" max="100" value={brightness} onChange={(e) => setBrightness(Number(e.target.value))} /><div className="control-row"><div className="control-icon blue"><Monitor size={18} /></div><div><small>Đang hiển thị trên</small><strong>DELL U2723QE <span className="online">● Online</span></strong></div></div><button className="outline-btn" onClick={() => notify("Đã mở trình chọn màn hình")}><Grid2X2 size={16} /> Quản lý màn hình</button></div></div><section className="section"><div className="section-heading"><div><h3>Wallpaper gần đây</h3><p>Chuyển đổi nhanh giữa bộ sưu tập của bạn.</p></div><button className="text-btn" onClick={() => onOpen("wallpapers")}>Xem tất cả <span>→</span></button></div><div className="wallpaper-row">{wallpapers.slice(0, 3).map((item) => <WallpaperCard key={item.title} item={item} onClick={() => notify(`Đã chọn ${item.title}`)} />)}</div></section><div className="bottom-grid"><div className="tip-card"><div className="tip-icon"><Activity size={20} /></div><div><span>MẸO NHANH</span><h3>Biến taskbar thành một phần của wallpaper.</h3><p>Thử chế độ trong suốt và tự động đổi màu theo nền.</p></div><button onClick={() => onOpen("taskbar")}>Khám phá <span>→</span></button></div><div className="weather-card"><CloudSun size={25} /><div><small>HÀ NỘI / HÔM NAY</small><strong>27° <span>Ít mây</span></strong></div><div className="weather-wave" /></div></div></>;
+function Overview({ item, playing, setPlaying, brightness, setBrightness, onOpen, notify }: { item: WallpaperItem; playing: boolean; setPlaying: (v: boolean) => void; brightness: number; setBrightness: (v: number) => void; onOpen: (v: View) => void; notify: (v: string) => void }) {
+  return <><div className="hero-grid"><div className="preview-card"><div className="preview-scene" style={{ filter: `brightness(${brightness}%)` }}>{item.source && item.kind === "video" && <video className="media-preview" src={item.source} autoPlay={playing} loop muted playsInline />}{item.source && item.kind === "image" && <img className="media-preview" src={item.source} alt={item.title} />}{!item.source && <><div className="sun-glow" /><div className="city-grid" /></>}<div className="scene-title"><span>ĐANG PHÁT</span><h2>{item.title}</h2><p>{item.type}</p></div><div className="preview-controls"><button className="round-control" onClick={() => setPlaying(!playing)}>{playing ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}</button><div className="track-line"><i /><span>{item.kind === "audio" ? "Audio" : "Live"}</span><b>{item.duration}</b></div><button className="round-control"><Volume2 size={17} /></button></div></div></div><div className="quick-panel"><div className="panel-title"><span>ĐIỀU KHIỂN NHANH</span><button onClick={() => onOpen("taskbar")}><Settings2 size={16} /></button></div><div className="control-row"><div className="control-icon violet"><Sun size={18} /></div><div><small>Độ sáng wallpaper</small><strong>{brightness}%</strong></div></div><input className="range" type="range" min="0" max="100" value={brightness} onChange={(e) => setBrightness(Number(e.target.value))} /><div className="control-row"><div className="control-icon blue"><Monitor size={18} /></div><div><small>Đang hiển thị trên</small><strong>DELL U2723QE <span className="online">● Online</span></strong></div></div><button className="outline-btn" onClick={() => notify("Đang dùng màn hình chính")}><Grid2X2 size={16} /> Quản lý màn hình</button></div></div><section className="section"><div className="section-heading"><div><h3>Wallpaper gần đây</h3><p>Chuyển đổi nhanh giữa bộ sưu tập của bạn.</p></div><button className="text-btn" onClick={() => onOpen("wallpapers")}>Xem tất cả <span>→</span></button></div><div className="wallpaper-row">{wallpapers.slice(0, 3).map((entry) => <WallpaperCard key={entry.title} item={entry} onClick={() => notify(`Đã chọn ${entry.title}`)} />)}</div></section><div className="bottom-grid"><div className="tip-card"><div className="tip-icon"><Activity size={20} /></div><div><span>MẸO NHANH</span><h3>Biến taskbar thành một phần của wallpaper.</h3><p>Thử chế độ trong suốt và tự động đổi màu theo nền.</p></div><button onClick={() => onOpen("taskbar")}>Khám phá <span>→</span></button></div><div className="weather-card"><CloudSun size={25} /><div><small>HÀ NỘI / HÔM NAY</small><strong>27° <span>Ít mây</span></strong></div><div className="weather-wave" /></div></div></>;
 }
 
 function Library({ items, search, setSearch, onAdd, notify }: { items: WallpaperItem[]; search: string; setSearch: (v: string) => void; onAdd: () => void; notify: (v: string) => void }) {
-  return <section className="library-view"><div className="library-toolbar"><div className="search-box"><Search size={17} /><input placeholder="Tìm trong thư viện..." value={search} onChange={(e) => setSearch(e.target.value)} /></div><button className="filter-btn"><SlidersHorizontal size={16} /> Bộ lọc</button><button className="outline-btn compact" onClick={onAdd}><Upload size={15} /> Import media</button></div><div className="format-pills"><span className="selected">Tất cả <b>12</b></span><span>Video <b>8</b></span><span>Ảnh <b>3</b></span><span>Project <b>1</b></span><span>Audio <b>2</b></span></div><div className="library-grid">{items.map((item) => <WallpaperCard key={item.title} item={item} large onClick={() => notify(`Đã áp dụng ${item.title}`)} />)}{items.length === 0 && <div className="empty-state">Không tìm thấy wallpaper phù hợp.</div>}</div></section>;
+  return <section className="library-view"><div className="library-toolbar"><div className="search-box"><Search size={17} /><input placeholder="Tìm trong thư viện..." value={search} onChange={(e) => setSearch(e.target.value)} /></div><button className="filter-btn"><SlidersHorizontal size={16} /> Bộ lọc</button><button className="outline-btn compact" onClick={onAdd}><Upload size={15} /> Import media</button></div><div className="format-pills"><span className="selected">Tất cả <b>{items.length}</b></span><span>Video</span><span>Ảnh</span><span>Project</span><span>Audio</span></div><div className="library-grid">{items.map((item) => <WallpaperCard key={item.title} item={item} large onClick={() => notify(`Đã áp dụng ${item.title}`)} />)}{items.length === 0 && <div className="empty-state">Không tìm thấy wallpaper phù hợp.</div>}</div></section>;
 }
 
 function WallpaperCard({ item, large, onClick }: { item: WallpaperItem; large?: boolean; onClick: () => void }) {
@@ -95,8 +97,17 @@ function Projects({ notify }: { notify: (v: string) => void }) {
 
 function Feature({ icon, title, text }: { icon: ReactNode; title: string; text: string }) { return <div className="feature"><div className="feature-icon">{icon}</div><strong>{title}</strong><p>{text}</p></div>; }
 
-function AddModal({ onClose, notify }: { onClose: () => void; notify: (v: string) => void }) {
-  return <div className="modal-backdrop" onClick={onClose}><div className="modal" onClick={(e) => e.stopPropagation()}><button className="modal-close" onClick={onClose}><X size={18} /></button><div className="upload-icon"><Upload /></div><h2>Thêm wallpaper mới</h2><p>Kéo thả file vào đây hoặc chọn từ máy tính.</p><div className="dropzone"><FolderOpen size={24} /><strong>Chọn media hoặc project</strong><span>MP4, WebM, GIF, JPG, PNG, HTML, ZIP · tối đa 2 GB</span><button className="outline-btn" onClick={() => { onClose(); notify("Đã mở trình chọn file"); }}>Chọn file</button></div><div className="supported"><span><Image size={15} /> Video & ảnh</span><span><Music2 size={15} /> M4A / audio</span><span><Code2 size={15} /> WebGL project</span></div></div></div>;
+function AddModal({ onClose, onImport }: { onClose: () => void; onImport: (item: WallpaperItem) => void }) {
+  const [error, setError] = useState("");
+  const selectFiles = (files: FileList | null) => {
+    const file = files?.[0];
+    if (!file) return;
+    const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+    const kind = file.type.startsWith("video/") || ["mp4", "webm", "mov", "m4v"].includes(extension) ? "video" : file.type.startsWith("image/") || ["gif", "jpg", "jpeg", "png", "webp"].includes(extension) ? "image" : file.type.startsWith("audio/") || ["m4a", "mp3", "wav", "ogg"].includes(extension) ? "audio" : undefined;
+    if (!kind) { setError("Chọn video, ảnh hoặc audio (MP4, WebM, GIF, JPG, PNG, M4A)."); return; }
+    onImport({ title: file.name.replace(/\.[^/.]+$/, ""), type: `${extension.toUpperCase()} / ${Math.round(file.size / 1024 / 1024)} MB`, duration: kind === "audio" ? "Audio" : "Imported", accent: kind === "image" ? "metal" : "tokyo", active: true, source: URL.createObjectURL(file), kind });
+  };
+  return <div className="modal-backdrop" onClick={onClose}><div className="modal" onClick={(e) => e.stopPropagation()}><button className="modal-close" onClick={onClose}><X size={18} /></button><div className="upload-icon"><Upload /></div><h2>Thêm wallpaper mới</h2><p>Kéo thả file vào đây hoặc chọn từ máy tính.</p><label className="dropzone"><FolderOpen size={24} /><strong>Chọn media từ máy</strong><span>MP4, WebM, GIF, JPG, PNG, M4A</span><span className="outline-btn">Chọn file<input className="file-input" type="file" accept="video/*,image/*,audio/*" onChange={(event) => selectFiles(event.target.files)} /></span>{error && <small className="upload-error">{error}</small>}</label><div className="supported"><span><Image size={15} /> Video & ảnh</span><span><Music2 size={15} /> M4A / audio</span><span><Code2 size={15} /> WebGL project</span></div></div></div>;
 }
 
 export default App;
