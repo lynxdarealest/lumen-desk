@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Activity, AudioLines, Bell, ChevronDown, CircleHelp, CloudSun, Code2, FolderOpen,
   GalleryVerticalEnd, Grid2X2, Image, LayoutDashboard, Monitor,
@@ -28,7 +28,7 @@ function App() {
   const [view, setView] = useState<View>("overview");
   const [library, setLibrary] = useState(wallpapers);
   const [playing, setPlaying] = useState(true);
-  const [brightness, setBrightness] = useState(78);
+  const [brightness, setBrightness] = useState(() => Number(window.localStorage.getItem("lumen-desk.brightness") ?? 78));
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [toast, setToast] = useState("");
@@ -39,6 +39,10 @@ function App() {
     setToast(message);
     window.setTimeout(() => setToast(""), 2600);
   };
+
+  useEffect(() => {
+    window.localStorage.setItem("lumen-desk.brightness", String(brightness));
+  }, [brightness]);
 
   return (
     <div className="app-shell">
