@@ -9,6 +9,7 @@ import {
 
 type View = "overview" | "wallpapers" | "taskbar" | "projects";
 type WallpaperItem = { title: string; type: string; duration: string; accent: string; active?: boolean; source?: string; kind?: "video" | "image" | "audio" };
+type ProjectItem = { title: string; entry: string; html: string };
 
 const wallpapers: WallpaperItem[] = [
   { title: "Neon Tokyo", type: "MP4 / 4K", duration: "02:14", accent: "tokyo", active: true },
@@ -27,6 +28,7 @@ const navItems: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
 function App() {
   const [view, setView] = useState<View>("overview");
   const [library, setLibrary] = useState(wallpapers);
+  const [project, setProject] = useState<ProjectItem | null>(null);
   const [playing, setPlaying] = useState(true);
   const [brightness, setBrightness] = useState(() => Number(window.localStorage.getItem("lumen-desk.brightness") ?? 78));
   const [search, setSearch] = useState("");
@@ -65,7 +67,7 @@ function App() {
           {view === "overview" && <Overview item={activeWallpaper} playing={playing} setPlaying={setPlaying} brightness={brightness} setBrightness={setBrightness} onOpen={(next) => setView(next)} notify={notify} />}
           {view === "wallpapers" && <Library items={filtered} search={search} setSearch={setSearch} onAdd={() => setShowAdd(true)} notify={notify} />}
           {view === "taskbar" && <Taskbar notify={notify} />}
-          {view === "projects" && <Projects notify={notify} />}
+          {view === "projects" && <Projects project={project} onImport={setProject} notify={notify} />}
         </div>
       </main>
       {showAdd && <AddModal onClose={() => setShowAdd(false)} onImport={(item) => { setLibrary((current) => [item, ...current.map((entry) => ({ ...entry, active: false }))]); setShowAdd(false); setPlaying(true); notify(`Đã thêm ${item.title}`); }} />}
@@ -95,8 +97,25 @@ function SettingToggle({ label, description, value, setValue }: { label: string;
   return <div className="setting-row"><div><strong>{label}</strong><p>{description}</p></div><button className={`toggle ${value ? "on" : ""}`} onClick={() => setValue(!value)}><i /></button></div>;
 }
 
-function Projects({ notify }: { notify: (v: string) => void }) {
-  return <section className="projects-view"><div className="project-banner"><div><span className="eyebrow">LUMEN RUNTIME</span><h2>Đưa project của bạn lên desktop.</h2><p>Chạy HTML, WebGL, Three.js và shader realtime như một live wallpaper native.</p><button className="primary-btn" onClick={() => notify("Trình tạo project đang sẵn sàng")}><Plus size={16} /> Tạo project mới</button></div><div className="code-orb"><span>&lt;/&gt;</span></div></div><div className="project-features"><Feature icon={<Wallpaper />} title="HTML / WebGL" text="Tương thích Three.js, PixiJS và shader canvas." /><Feature icon={<AudioLines />} title="Audio reactive" text="Đồng bộ hình ảnh với MP3, M4A, WAV và mic." /><Feature icon={<Tv2 />} title="Multi-monitor" text="Mỗi màn hình một scene, một cấu hình riêng." /></div><div className="project-list"><div className="section-heading"><div><h3>Project của bạn</h3><p>Quản lý các workspace realtime.</p></div><button className="text-btn" onClick={() => notify("Đã mở thư mục project")}>Mở thư mục <FolderOpen size={15} /></button></div><div className="project-empty"><Code2 size={25} /><strong>Chưa có project nào</strong><span>Import một folder HTML/WebGL để bắt đầu.</span><button className="outline-btn compact" onClick={() => notify("Đã mở trình chọn folder")}>Import project</button></div></div></section>;
+function Projects({ project, onImport, notify }: { project: ProjectItem | null; onImport: (project: ProjectItem) => void; notify: (v: string) => void }) {
+  const [error, setError] = useState("");
+  const importProject = async (files: FileList | null) => {
+    const all = files ? Array.from(files) : [];
+    const entry = all.find((file) => file.name.toLowerCase().endsWith("index.html"));
+    if (!entry) { setError("Không tìm thấy index.html trong folder."); return; }
+    const html = await entry.text();
+    const folderName = entry.webkitRelativePath.split("/")[0] || "WebGL project";
+    const urls = new Map(all.map((file) => [file.webkitRelativePath.split("/").slice(1).join("/"), URL.createObjectURL(file)]));
+    const rewritten = html.replace(/(src|href)=(["'])([^"']+)\2/gi, (match, attribute, quote, path) => {
+      const cleanPath = path.replace(/^\.?\//, "");
+      const url = urls.get(cleanPath);
+      return url ? `${attribute}=${quote}${url}${quote}` : match;
+    });
+    onImport({ title: folderName, entry: entry.webkitRelativePath, html: rewritten });
+    notify(`Đã nạp project ${folderName}`);
+  };
+  const directoryInput = { webkitdirectory: "" };
+  return <section className="projects-view"><div className="project-banner"><div><span className="eyebrow">LUMEN RUNTIME</span><h2>Đưa project của bạn lên desktop.</h2><p>Chạy HTML, WebGL, Three.js và shader realtime như một live wallpaper native.</p><label className="primary-btn"><Plus size={16} /> Import folder<input className="file-input" type="file" multiple {...directoryInput} onChange={(event) => importProject(event.target.files)} /></label></div><div className="code-orb"><span>&lt;/&gt;</span></div></div><div className="project-features"><Feature icon={<Wallpaper />} title="HTML / WebGL" text="Tương thích Three.js, PixiJS và shader canvas." /><Feature icon={<AudioLines />} title="Audio reactive" text="Đồng bộ hình ảnh với MP3, M4A, WAV và mic." /><Feature icon={<Tv2 />} title="Multi-monitor" text="Mỗi màn hình một scene, một cấu hình riêng." /></div><div className="project-list"><div className="section-heading"><div><h3>Project của bạn</h3><p>Import folder có index.html để chạy thử.</p></div>{project && <button className="text-btn" onClick={() => notify("Project đang chạy trong preview")}>Đang chạy <Activity size={15} /></button>}</div>{project ? <div className="project-runtime"><div className="runtime-head"><strong>{project.title}</strong><small>{project.entry}</small></div><iframe title={project.title} srcDoc={project.html} sandbox="allow-scripts allow-same-origin" /></div> : <div className="project-empty"><Code2 size={25} /><strong>Chưa có project nào</strong><span>Import folder HTML/WebGL để bắt đầu.</span><label className="outline-btn compact">Chọn folder<input className="file-input" type="file" multiple {...directoryInput} onChange={(event) => importProject(event.target.files)} /></label>{error && <small className="upload-error">{error}</small>}</div>}</div></section>;
 }
 
 function Feature({ icon, title, text }: { icon: ReactNode; title: string; text: string }) { return <div className="feature"><div className="feature-icon">{icon}</div><strong>{title}</strong><p>{text}</p></div>; }
