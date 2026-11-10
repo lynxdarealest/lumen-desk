@@ -6,6 +6,7 @@ import {
   SlidersHorizontal, Sun, Tv2, Upload, Volume2, Wallpaper,
   Waves, X
 } from "lucide-react";
+import { writeLog } from "./logger";
 
 type View = "overview" | "wallpapers" | "taskbar" | "projects";
 type WallpaperItem = { title: string; type: string; duration: string; accent: string; active?: boolean; source?: string; kind?: "video" | "image" | "audio" };
@@ -34,13 +35,25 @@ function App() {
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [toast, setToast] = useState("");
+  const [toastKind, setToastKind] = useState<"info" | "error">("info");
   const activeWallpaper = library.find((item) => item.active) ?? library[0];
   const filtered = useMemo(() => library.filter((item) => item.title.toLowerCase().includes(search.toLowerCase())), [library, search]);
 
   const notify = (message: string) => {
     setToast(message);
+    setToastKind("info");
+    void writeLog("info", message);
     window.setTimeout(() => setToast(""), 2600);
   };
+
+  useEffect(() => {
+    const handleError = (event: Event) => {
+      setToast((event as CustomEvent<string>).detail);
+      setToastKind("error");
+    };
+    window.addEventListener("lumen-error", handleError);
+    return () => window.removeEventListener("lumen-error", handleError);
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem("lumen-desk.brightness", String(brightness));
@@ -71,7 +84,7 @@ function App() {
         </div>
       </main>
       {showAdd && <AddModal onClose={() => setShowAdd(false)} onImport={(item) => { setLibrary((current) => [item, ...current.map((entry) => ({ ...entry, active: false }))]); setShowAdd(false); setPlaying(true); notify(`Đã thêm ${item.title}`); }} />}
-      {toast && <div className="toast"><Activity size={16} />{toast}</div>}
+      {toast && <div className={`toast ${toastKind === "error" ? "toast-error" : ""}`}><Activity size={16} />{toast}</div>}
     </div>
   );
 }
@@ -127,7 +140,7 @@ function AddModal({ onClose, onImport }: { onClose: () => void; onImport: (item:
     if (!file) return;
     const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
     const kind = file.type.startsWith("video/") || ["mp4", "webm", "mov", "m4v"].includes(extension) ? "video" : file.type.startsWith("image/") || ["gif", "jpg", "jpeg", "png", "webp"].includes(extension) ? "image" : file.type.startsWith("audio/") || ["m4a", "mp3", "wav", "ogg"].includes(extension) ? "audio" : undefined;
-    if (!kind) { setError("Chọn video, ảnh hoặc audio (MP4, WebM, GIF, JPG, PNG, M4A)."); return; }
+    if (!kind) { const message = "Chọn video, ảnh hoặc audio (MP4, WebM, GIF, JPG, PNG, M4A)."; setError(message); void writeLog("warn", message, file.name); return; }
     onImport({ title: file.name.replace(/\.[^/.]+$/, ""), type: `${extension.toUpperCase()} / ${Math.round(file.size / 1024 / 1024)} MB`, duration: kind === "audio" ? "Audio" : "Imported", accent: kind === "image" ? "metal" : "tokyo", active: true, source: URL.createObjectURL(file), kind });
   };
   return <div className="modal-backdrop" onClick={onClose}><div className="modal" onClick={(e) => e.stopPropagation()}><button className="modal-close" onClick={onClose}><X size={18} /></button><div className="upload-icon"><Upload /></div><h2>Thêm wallpaper mới</h2><p>Kéo thả file vào đây hoặc chọn từ máy tính.</p><label className="dropzone"><FolderOpen size={24} /><strong>Chọn media từ máy</strong><span>MP4, WebM, GIF, JPG, PNG, M4A</span><span className="outline-btn">Chọn file<input className="file-input" type="file" accept="video/*,image/*,audio/*" onChange={(event) => selectFiles(event.target.files)} /></span>{error && <small className="upload-error">{error}</small>}</label><div className="supported"><span><Image size={15} /> Video & ảnh</span><span><Music2 size={15} /> M4A / audio</span><span><Code2 size={15} /> WebGL project</span></div></div></div>;

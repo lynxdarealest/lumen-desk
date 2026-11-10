@@ -146,6 +146,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
 .upload-error { color: #e08b7c; font-size: 10px; }
 .toast { position: fixed; right: 28px; bottom: 28px; z-index: 20; display: flex; align-items: center; gap: 8px; padding: 12px 16px; color: #e6ddc9; background: #25231c; border: 1px solid #80673d; border-radius: 4px; font-size: 11px; box-shadow: 0 12px 30px #0005; }
+.toast-error { color: #ffe1dc; background: #3a211f; border-color: #b35e55; }
 
 @media (max-width: 1180px) {
   .content { padding-right: 30px; padding-left: 30px; }
